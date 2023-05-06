@@ -1,0 +1,27 @@
+apiVersion: v2
+description: A convenience template for building dashboards with stackql.
+name: stackql-dashboards
+home: https://stackql.io/
+keywords:
+  - SQL
+  - Analytical
+  - OLAP
+  - BI
+  - Business Intelligence
+  - Dashboards
+sources:
+  - https://github.com/stackql/stackql
+maintainers:
+  - name: General Kroll
+    email: generalkroll0@gmail.com
+    url: https://github.com/general-kroll-4-life
+version: 0.1.0
+dependencies:
+  - name: stackql
+    version: 0.1.4
+    repository: "file://../stackql"
+    condition: stackql.enabled
+  - name: superset
+    version: 0.9.4
+    repository: http://apache.github.io/superset
+    condition: superset.enabled

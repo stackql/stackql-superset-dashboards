@@ -1,0 +1,17 @@
+
+stackql:
+  enabled: true
+
+superset:
+  enabled: true
+  postgresql:
+    nameOverride: superset-postgresql
+  init:
+    adminUser:
+      username: admin
+      firstname: Superset
+      lastname: Admin
+      email: admin@superset.com
+      password: somepassword
+  redis:
+    nameOverride: superset-redis

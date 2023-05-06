@@ -35,3 +35,4 @@
 .project
 .idea/
 *.tmproj
+.DS_Store

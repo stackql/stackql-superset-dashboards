@@ -91,7 +91,7 @@ extraSecretEnv: {}
   # GOOGLE_KEY: ...
   # GOOGLE_SECRET: ...
 
-# -- Extra files to mount on `/app/pythonpath`
+# -- Extra files to mount on `/opt/stackql/extraConfig`
 extraConfigs: {}
   # import_datasources.yaml: |
   #     databases:
@@ -105,8 +105,9 @@ extraConfigs: {}
   #       sqlalchemy_uri: example://example-db.local
   #       tables: []
 
-# -- Extra files to mount on `/app/pythonpath` as secrets
-extraSecrets: {}
+# -- Extra files to mount on `/opt/stackql/config` as secrets
+extraSecrets:
+  google-credentials.json: '{}'  # Substitute your Google credentials here
 
 extraVolumes: []
   # - name: customConfig
@@ -168,9 +169,9 @@ configOverridesFiles: {}
   # extend_timeout: extend_timeout.py
   # enable_oauth: enable_oauth.py
 
-configMountPath: "/app/pythonpath"
+configMountPath: "/opt/stackql/config"
 
-extraConfigMountPath: "/app/configs"
+extraConfigMountPath: "/opt/stackql/extraConfig"
 
 registryMountPath: "/opt/stackql/registry"
 
@@ -223,7 +224,7 @@ x-initDbScripts: &initDbScripts
 
 service:
   type: ClusterIP
-  port: 7432
+  port: '7432'
   annotations:
     {}
     # cloud.google.com/load-balancer-type: "Internal"
@@ -261,12 +262,12 @@ stackqlNode:
   command:
     - stackql 
     - --loglevel=DEBUG 
-    - '--auth={ "google": { "credentialsfilepath": "/opt/stackql/keys/google_service_account.json", "type": "service_account" }, "okta": { "credentialsenvvar": "OKTA_SECRET_KEY", "type": "api_key", "valuePrefix": "SSWS " }, "github": { "type": "basic", "credentialsenvvar": "GITHUB_CREDS" }, "aws": { "type": "aws_signing_v4", "credentialsenvvar": "AWS_SECRET_ACCESS_KEY", "keyIDenvvar": "AWS_ACCESS_KEY_ID" }, "azure": { "type": "azure_default" }, "k8s": { "credentialsenvvar": "K8S_TOKEN", "type": "api_key" } }'
+    - '--auth={ "google": { "credentialsfilepath": "{{- tpl .Values.configMountPath . }}/google-credentials.json", "type": "service_account" }, "okta": { "credentialsenvvar": "OKTA_SECRET_KEY", "type": "api_key", "valuePrefix": "SSWS " }, "github": { "type": "basic", "credentialsenvvar": "STACKQL_GITHUB_TOKEN" }, "aws": { "type": "aws_signing_v4", "credentialsenvvar": "AWS_SECRET_ACCESS_KEY", "keyIDenvvar": "AWS_ACCESS_KEY_ID" }, "k8s": { "credentialsenvvar": "STACKQL_K8S_TOKEN", "type": "api_key" } }'
     - '--registry={ "url": "{{ .Values.providerRegistry.url }}", "localDocRoot": "{{ .Values.registryMountPath }}" }'
-    - '--sqlBackend={ "dbEngine": "postgres_tcp", "sqlDialect": "postgres", "dsn": "postgres://stackql:stackql@{{ tpl .Values.stackqlNode.connections.db_host . }}:{{ tpl .Values.stackqlNode.connections.db_port . }}/stackql" }'
+    - '--sqlBackend={ "dbEngine": "postgres_tcp", "sqlDialect": "postgres", "dsn": "postgres://{{ tpl .Values.stackqlNode.connections.db_user . }}:{{ tpl .Values.stackqlNode.connections.db_pass . }}@{{ tpl .Values.stackqlNode.connections.db_host . }}:{{ tpl .Values.stackqlNode.connections.db_port . }}/{{ tpl .Values.stackqlNode.connections.db_name . }}" }'
     - '--dbInternal={ "tableRegex": "(?i)^(?:public\\\\.)?(?:pg_.*|current_schema|stackql_intel)" }'
     - --pgsrv.address=0.0.0.0
-    - --pgsrv.port=5474
+    - --pgsrv.port={{ tpl .Values.service.port . }}
     - srv
   connections:
     # You need to change below configuration incase bringing own PostgresSQL instance and also set postgresql.enabled:false
@@ -302,7 +303,7 @@ stackqlNode:
           - --loglevel=DEBUG
           - '--registry={ "url": "{{ .Values.providerRegistry.url }}" , "localDocRoot": "{{ .Values.registryMountPath }}" }'
           - exec
-          - registry pull google; registry pull github; registry pull azure; registry pull digitalocean; registry pull okta;
+          - registry pull google; registry pull github; registry pull azure; registry pull digitalocean; registry pull okta; registry pull aws; registry pull k8s;
 
   # -- Launch additional containers into stackqlNode pod
   extraContainers: []
