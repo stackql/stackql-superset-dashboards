@@ -1,0 +1,184 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "stackql.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "stackql.name" . }}
+    chart: {{ template "stackql.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    {{- if .Values.stackqlNode.deploymentLabels }}
+      {{- toYaml .Values.stackqlNode.deploymentLabels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.stackqlNode.deploymentAnnotations }}
+  annotations: {{- toYaml .Values.stackqlNode.deploymentAnnotations | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.stackqlNode.replicaCount }}
+  {{- if .Values.stackqlNode.strategy }}
+  strategy: {{- toYaml .Values.stackqlNode.strategy | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "stackql.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        # Force reload on config changes
+        checksum/stackql_init.sh: {{ tpl .Values.init.initscript . | sha256sum }}
+        checksum/connections: {{ .Values.stackqlNode.connections | toYaml | sha256sum }}
+        checksum/extraConfigs: {{ .Values.extraConfigs | toYaml | sha256sum }}
+        checksum/extraSecrets: {{ .Values.extraSecrets | toYaml | sha256sum }}
+        checksum/extraSecretEnv: {{ .Values.extraSecretEnv | toYaml | sha256sum }}
+        checksum/configOverrides: {{ .Values.configOverrides | toYaml | sha256sum }}
+        checksum/configOverridesFiles: {{ .Values.configOverridesFiles | toYaml | sha256sum }}
+        {{- if .Values.stackqlNode.forceReload }}
+        # Optionally force the thing to reload
+        force-reload: {{ randAlphaNum 5 | quote }}
+        {{- end }}
+        {{- if .Values.stackqlNode.podAnnotations }}
+          {{- toYaml .Values.stackqlNode.podAnnotations | nindent 8 }}
+        {{- end }}
+      labels:
+        app: {{ template "stackql.name" . }}
+        release: {{ .Release.Name }}
+        {{- if .Values.stackqlNode.podLabels }}
+          {{- toYaml .Values.stackqlNode.podLabels | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if or (.Values.serviceAccount.create) (.Values.serviceAccountName) }}
+      serviceAccountName: {{ template "stackql.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        runAsUser: {{ .Values.runAsUser }}
+        {{- if .Values.stackqlNode.podSecurityContext }}
+          {{- toYaml .Values.stackqlNode.podSecurityContext | nindent 8 }}
+        {{- end }}
+      {{- if .Values.stackqlNode.initContainers }}
+      initContainers: {{- tpl (toYaml .Values.stackqlNode.initContainers) . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.hostAliases }}
+      hostAliases: {{- toYaml . | nindent 6 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.stackqlNode.containerSecurityContext }}
+          securityContext: {{- toYaml .Values.stackqlNode.containerSecurityContext | nindent 12 }}
+          {{- end }}
+          command: {{  tpl (toJson .Values.stackqlNode.command) . }}
+          env:
+            {{- range $key, $value := .Values.extraEnv }}
+            - name: {{ $key | quote}}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- range $key, $value := .Values.stackqlNode.env }}
+            - name: {{ $key | quote}}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.extraEnvRaw }}
+              {{- toYaml .Values.extraEnvRaw | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ tpl .Values.envFromSecret . | quote }}
+            {{- range .Values.envFromSecrets }}
+            - secretRef:
+                name: {{ tpl . $ | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: stackql-registry
+              mountPath: {{ .Values.registryMountPath | quote }}
+            - name: stackql-config
+              mountPath: {{ .Values.configMountPath | quote }}
+              readOnly: true
+            {{- if .Values.extraConfigs }}
+            - name: stackql-extra-config
+              mountPath: {{ .Values.extraConfigMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+              {{- tpl (toYaml .) $ | nindent 12 -}}
+            {{- end }}
+          ports:
+            - name: postgreswire
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          {{- if .Values.stackqlNode.startupProbe }}
+          startupProbe: {{- .Values.stackqlNode.startupProbe | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.stackqlNode.readinessProbe }}
+          readinessProbe: {{- .Values.stackqlNode.readinessProbe | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.stackqlNode.livenessProbe }}
+          livenessProbe: {{- .Values.stackqlNode.livenessProbe | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- if .Values.stackqlNode.resources }}
+              {{- toYaml .Values.stackqlNode.resources | nindent 12 }}
+            {{- else }}
+              {{- toYaml .Values.resources | nindent 12 }}
+            {{- end }}
+        {{- if .Values.stackqlNode.extraContainers }}
+          {{- toYaml .Values.stackqlNode.extraContainers | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.affinity .Values.stackqlNode.affinity }}
+      affinity:
+        {{- with .Values.affinity }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.stackqlNode.affinity }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if or .Values.topologySpreadConstraints .Values.stackqlNode.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- with .Values.topologySpreadConstraints }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.stackqlNode.topologySpreadConstraints }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: stackql-registry
+          emptyDir: {}
+        - name: stackql-config
+          secret:
+            secretName: {{ tpl .Values.configFromSecret . }}
+        {{- if .Values.extraConfigs }}
+        - name: stackql-extra-config
+          configMap:
+            name: {{ template "stackql.fullname" . }}-extra-config
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+          {{- tpl (toYaml .) $ | nindent 8 -}}
+        {{- end }}
