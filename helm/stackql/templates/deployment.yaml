@@ -47,6 +47,7 @@ spec:
         checksum/connections: {{ .Values.stackqlNode.connections | toYaml | sha256sum }}
         checksum/extraConfigs: {{ .Values.extraConfigs | toYaml | sha256sum }}
         checksum/extraSecrets: {{ .Values.extraSecrets | toYaml | sha256sum }}
+        checksum/startupSQLScripts: {{ .Values.startupSQLScripts | toYaml | sha256sum }}
         checksum/extraSecretEnv: {{ .Values.extraSecretEnv | toYaml | sha256sum }}
         checksum/configOverrides: {{ .Values.configOverrides | toYaml | sha256sum }}
         checksum/configOverridesFiles: {{ .Values.configOverridesFiles | toYaml | sha256sum }}
@@ -174,6 +175,9 @@ spec:
         - name: stackql-config
           secret:
             secretName: {{ tpl .Values.configFromSecret . }}
+        - name: stackql-sql-init-scripts
+          secret:
+            secretName: {{ tpl .Values.stackqlSqlFromSecret . }}
         {{- if .Values.extraConfigs }}
         - name: stackql-extra-config
           configMap:

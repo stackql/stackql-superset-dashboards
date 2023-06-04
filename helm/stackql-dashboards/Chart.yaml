@@ -18,7 +18,7 @@ maintainers:
 version: 0.1.0
 dependencies:
   - name: stackql
-    version: 0.1.4
+    version: 0.1.5
     repository: "file://../stackql"
     condition: stackql.enabled
   - name: superset

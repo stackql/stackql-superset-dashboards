@@ -24,6 +24,8 @@ psql --host localhost -U stackql -d stackql --port <local port number for stackq
 ### Manual testing of stackql-dashboard
 
 ```shell
+helm dependency update helm/stackql-dashboards
+
 helm template --release-name v1 --namespace default helm/stackql-dashboards > helm/stackql-dashboards/out/stackql-dashboards.yaml
 
 
@@ -31,7 +33,7 @@ helm template --release-name v1 --namespace default helm/stackql-dashboards > he
 helm template --release-name v1 --namespace default --set superset.service.type=NodePort --set superset.service.nodePort.http="" helm/stackql-dashboards > helm/stackql-dashboards/out/stackql-dashboards.yaml
 
 ## ++secrets, for development on local kube
-helm template --release-name v1 --namespace default --set superset.service.type=NodePort --set superset.service.nodePort.http="" -f helm/stackql-dashboards/secrets/secret-values.yaml helm/stackql-dashboards > helm/stackql-dashboards/out/stackql-dashboards.yaml
+helm template --release-name v1 --namespace default --set superset.service.type=NodePort --set superset.service.nodePort.http="" -f stock/multi-cloud/multi-cloud-values.yaml -f helm/stackql-dashboards/secrets/secret-values.yaml helm/stackql-dashboards > helm/stackql-dashboards/out/stackql-dashboards.yaml
 
 
 kubectl apply -f helm/stackql-dashboards/out/stackql-dashboards.yaml

@@ -46,6 +46,8 @@ bootstrapScript: |
 # Note: this secret must have the key stackql_config.py in it and can include other files as well
 configFromSecret: '{{ template "stackql.fullname" . }}-config'
 
+stackqlSqlFromSecret: '{{ template "stackql.fullname" . }}-stackql-sql-init-scripts-config'
+
 # -- The name of the secret which we will use to populate env vars in deployed pods
 # This can be useful for secret keys, etc.
 envFromSecret: '{{ template "stackql.fullname" . }}-env'
@@ -109,6 +111,16 @@ extraConfigs: {}
 extraSecrets:
   google-credentials.json: '{}'  # Substitute your Google credentials here
 
+startupSQLScripts:
+  01-setup-stackql.sql: |
+    registry pull google; 
+    registry pull github; 
+    registry pull azure; 
+    registry pull digitalocean; 
+    registry pull okta; 
+    registry pull aws; 
+    registry pull k8s;
+
 extraVolumes: []
   # - name: customConfig
   #   configMap:
@@ -170,6 +182,8 @@ configOverridesFiles: {}
   # enable_oauth: enable_oauth.py
 
 configMountPath: "/opt/stackql/config"
+
+stackqlSqlInitScriptsMountPath: "/opt/stackql/sqlInitScripts"
 
 extraConfigMountPath: "/opt/stackql/extraConfig"
 
@@ -292,18 +306,25 @@ stackqlNode:
         - /bin/sh
         - -c
         - dockerize -wait "tcp://$DB_HOST:$DB_PORT" -timeout 120s
-    - name: pre-populate-registry
+    - name: stackql-setup
       image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
       imagePullPolicy: "{{ .Values.image.pullPolicy }}"
       volumeMounts:
         - name: stackql-registry
           mountPath: "{{ tpl .Values.registryMountPath . }}"
+        - name: stackql-config
+          mountPath: "{{ tpl .Values.configMountPath . }}"
+          readOnly: true
+        - name: stackql-sql-init-scripts
+          mountPath: "{{ tpl .Values.stackqlSqlInitScriptsMountPath . }}"
+          readOnly: true
       command:
           - stackql 
           - --loglevel=DEBUG
           - '--registry={ "url": "{{ .Values.providerRegistry.url }}" , "localDocRoot": "{{ .Values.registryMountPath }}" }'
+          - '--sqlBackend={ "dbEngine": "postgres_tcp", "sqlDialect": "postgres", "dsn": "postgres://{{ tpl .Values.stackqlNode.connections.db_user . }}:{{ tpl .Values.stackqlNode.connections.db_pass . }}@{{ tpl .Values.stackqlNode.connections.db_host . }}:{{ tpl .Values.stackqlNode.connections.db_port . }}/{{ tpl .Values.stackqlNode.connections.db_name . }}" }'
           - exec
-          - registry pull google; registry pull github; registry pull azure; registry pull digitalocean; registry pull okta; registry pull aws; registry pull k8s;
+          - '--infile={{ tpl .Values.stackqlSqlInitScriptsMountPath . }}/01-setup-stackql.sql'
 
   # -- Launch additional containers into stackqlNode pod
   extraContainers: []
