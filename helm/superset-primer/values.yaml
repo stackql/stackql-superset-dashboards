@@ -1,0 +1,503 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Default values for primer.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# A README is automatically generated from this file to document it, using helm-docs (see https://github.com/norwoodj/helm-docs)
+# To update it, install helm-docs and run helm-docs from the root of this chart
+
+# -- User ID directive. This user must have enough permissions to run the bootstrap script
+# Running containers as root is not recommended in production. Change this to another UID - e.g. 1000 to be more secure
+runAsUser: 0
+
+providerRegistry:
+  url: "https://registry.primer.app/providers"
+
+# serviceAccountName: primer
+serviceAccount:
+  create: false
+  annotations: {}
+
+# -- The name of the secret which we will use to generate a stackql_config.py file
+# Note: this secret must have the key stackql_config.py in it and can include other files as well
+configFromSecret: '{{ template "primer.fullname" . }}-config'
+
+stackqlSqlFromSecret: '{{ template "primer.fullname" . }}-primer-sql-init-scripts-config'
+
+# -- The name of the secret which we will use to populate env vars in deployed pods
+# This can be useful for secret keys, etc.
+envFromSecret: '{{ template "primer.fullname" . }}-env'
+# -- This can be a list of templated strings
+envFromSecrets: []
+
+# -- Extra environment variables that will be passed into pods
+extraEnv: {}
+
+resourceConfigMountPath: "/opt/primer/resourceConfig"
+
+configMountPath: "/opt/primer/config"
+
+stackqlSqlInitScriptsMountPath: "/opt/primer/sqlInitScripts"
+
+extraConfigMountPath: "/opt/primer/extraConfig"
+
+registryMountPath: "/opt/primer/registry"
+
+image:
+  repository: apache/superset # can be anything containing python and jinja2
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+initImage:
+  repository: jwilder/dockerize
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # The limits below will apply to all primer components. To set individual resource limitations refer to the pod specific values below.
+  # The pod specific values will overwrite anything that is set here.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# -- Custom hostAliases for all primer pods
+## https://kubernetes.io/docs/tasks/network/customize-hosts-file-for-pods/
+hostAliases: []
+# - hostnames:
+#   - nodns.my.lan
+#   ip: 18.27.36.45
+
+
+dashboardAPI:
+  host: v1-superset
+  port: "8088"
+  protocol: http
+  username: changeme
+  password: changeme
+  waitForAPITimeout: 120s
+
+
+primerNode:
+  # Configure resources
+  # Warning: fab command consumes a lot of ram and can
+  # cause the process to be killed due to OOM if it exceeds limit
+  # Make sure you are giving a strong password for the admin user creation( else make sure you are changing after setup)
+  # Also change the admin email to your own custom email.
+  resources: {}
+    # limits:
+    #   cpu:
+    #   memory:
+    # requests:
+    #   cpu:
+    #   memory:
+  # -- Command
+  # @default -- a `stackql_init.sh` command
+  command:
+    - "/bin/sh"
+    - "-c"
+    - ". {{ .Values.configMountPath }}/init.sh"
+  enabled: true
+  helmHook: true
+  loadExamples: false
+  createAdmin: true
+  adminUser:
+    username: admin
+    firstname: primer
+    lastname: Admin
+    email: admin@primer.com
+    password: admin
+  # -- List of initContainers
+  # @default -- a container waiting for postgres
+  initContainers:
+    - name: wait-for-db
+      image: "{{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}"
+      imagePullPolicy: "{{ .Values.initImage.pullPolicy }}"
+      envFrom:
+        - secretRef:
+            name: "{{ tpl .Values.envFromSecret . }}"
+      command:
+        - /bin/sh
+        - -c
+        - |
+          if [ "${WAIT_FOR_API}" != "false" ]; then 
+            dockerize -wait "$DASHBOARD_API_PROTOCOL://$DASHBOARD_API_HOST:$DASHBOARD_API_PORT" -timeout ${WAIT_FOR_API_TIMEOUT:-120s}
+          fi;
+  # -- A primer init script
+  # @default -- a script to create admin user and initailize roles
+  initscript: |
+      #!/bin/sh
+      set -eu
+      echo "Init invoked..."
+      if [ -f "{{ .Values.configMountPath }}/bootstrap.py" ]; then
+        echo "Running bootstrap script..."
+        python {{ .Values.configMountPath }}/bootstrap.py $API_USERNAME $API_PASSWORD --port={{ .Values.dashboardAPI.port }} --host={{ .Values.dashboardAPI.host }} --protocol={{ .Values.dashboardAPI.protocol }} --resource_template_dir={{ .Values.resourceConfigMountPath }}
+        echo echo "Bootstrap script completed"
+      else
+        echo "No bootstrap script supplied"
+      fi
+  
+
+  ## Annotations to be added to init job pods
+  podAnnotations: {}
+  podSecurityContext: {}
+  containerSecurityContext: {}
+  ## Tolerations to be added to init job pods
+  tolerations: []
+  ## Affinity to be added to init job pods
+  affinity: {}
+  # -- TopologySpreadConstrains to be added to init job
+  topologySpreadConstraints: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# -- TopologySpreadConstrains to be added to all deployments
+topologySpreadConstraints: []
+
+waitForDb: true
+
+resourcesConfigSecrets:
+  charts.json.jinja: |
+    [
+      {% if 'manual_dataset' in created_datasets and 'ops' in created_dashboards %}
+      {
+          "dashboards": [  {{ created_dashboards['ops']['id'] }} ],
+          "datasource_id": {{ created_datasets['manual_dataset']['id'] }},
+          "datasource_type": "table",
+          "description": "string",
+          "external_url": "string",
+          "is_managed_externally": true,
+          "owners": [
+              {{ user_id }}
+          ],
+          "params": "{\"datasource\":\"{{ created_datasets['manual_dataset']['id'] }}__table\",\"viz_type\":\"pie\",\"groupby\":[\"type\"],\"metric\":{\"expressionType\":\"SIMPLE\",\"column\":{\"advanced_data_type\":null,\"certification_details\":null,\"certified_by\":null,\"column_name\":\"name\",\"description\":null,\"expression\":null,\"filterable\":true,\"groupby\":true,\"is_certified\":false,\"is_dttm\":false,\"python_date_format\":null,\"type\":\"STRING\",\"type_generic\":1,\"verbose_name\":null,\"warning_markdown\":null},\"aggregate\":\"COUNT\",\"sqlExpression\":null,\"datasourceWarning\":false,\"hasCustomLabel\":false,\"label\":\"COUNT(name)\",\"optionName\":\"{{ option_name_prefix }}1\"},\"adhoc_filters\":[],\"row_limit\":100,\"sort_by_metric\":true,\"color_scheme\":\"supersetColors\",\"show_labels_threshold\":5,\"show_legend\":true,\"legendType\":\"scroll\",\"legendOrientation\":\"top\",\"label_type\":\"key\",\"number_format\":\"SMART_NUMBER\",\"date_format\":\"smart_date\",\"show_labels\":true,\"labels_outside\":true,\"outerRadius\":70,\"innerRadius\":30,\"extra_form_data\":{},\"dashboards\":[ {{ created_dashboards['ops']['id'] }} ]}",
+          "slice_name": "Auto Generated Machine Type Chart",
+          "viz_type": "pie"
+      },
+      {% endif %} 
+      {% if 'vms_dataset' in created_datasets and 'ops' in created_dashboards %}
+      {
+        "dashboards": [
+              {{ created_dashboards['ops']['id'] }}
+          ],
+          "datasource_id": {{ created_datasets['manual_dataset']['id'] }},
+          "datasource_type": "table",
+          "description": "string",
+          "external_url": "string",
+          "is_managed_externally": true,
+          "owners": [
+              {{ user_id }}
+          ],
+        "params": "{\"datasource\":\"{{ created_datasets['manual_dataset']['id'] }}__table\",\"viz_type\":\"gauge_chart\",\"groupby\":[\"type\"],\"metric\":{\"expressionType\":\"SIMPLE\",\"column\":{\"advanced_data_type\":null,\"certification_details\":null,\"certified_by\":null,\"column_name\":\"name\",\"description\":null,\"expression\":null,\"filterable\":true,\"groupby\":true,\"id\":12,\"is_certified\":false,\"is_dttm\":false,\"python_date_format\":null,\"type\":\"STRING\",\"type_generic\":1,\"verbose_name\":null,\"warning_markdown\":null},\"aggregate\":\"COUNT\",\"sqlExpression\":null,\"datasourceWarning\":false,\"hasCustomLabel\":false,\"label\":\"COUNT(name)\",\"optionName\":\"{{ option_name_prefix }}1\"},\"adhoc_filters\":[],\"row_limit\":1000,\"start_angle\":225,\"end_angle\":-45,\"color_scheme\":\"supersetColors\",\"font_size\":15,\"number_format\":\"SMART_NUMBER\",\"value_formatter\":\"{value}\",\"show_pointer\":true,\"animation\":true,\"show_split_line\":false,\"split_number\":10,\"show_progress\":true,\"overlap\":false,\"round_cap\":true,\"extra_form_data\":{},\"dashboards\":[ {{ created_dashboards['ops']['id'] }} ]}",
+        "slice_name": "Machine Gauge",
+        "viz_type": "gauge_chart"
+      }
+      {% endif %} 
+    ]
+  dashboards.json.jinja: |
+    {
+        "ops": {
+            "dashboard_title": "Auto Generated Ops Dashboard",
+            "is_managed_externally": true,
+            "owners": [
+                {{ user_id }}
+            ],
+            "published": true,
+            "roles": []
+        },
+        "iam": {
+            "dashboard_title": "Auto Generated IAM Dashboard",
+            "is_managed_externally": true,
+            "owners": [
+                {{ user_id }}
+            ],
+            "published": true,
+            "roles": []
+        }
+    }
+  datasets.json.jinja: |
+    {
+        "manual_dataset": {
+            "always_filter_main_dttm": false,
+            "database": {{ stackql_db_id }},
+            "normalize_columns": false,
+            "owners": [
+                {{ user_id }}
+            ],
+            "sql": "select name, split_part(split_part(machineType, '/', 11), '-', 2) as type,  json_extract_path_text(json_extract_path_text(networkInterfaces, '0'), 'networkIP') as ipAddress from google.compute.instances  where project = 'stackql-demo' and zone = 'australia-southeast1-a';",
+            "table_name": "manual_dataset"
+        },
+        "vms_dataset": {
+            "always_filter_main_dttm": false,
+            "database": {{ stackql_db_id }},
+            "normalize_columns": false,
+            "owners": [
+                {{ user_id }}
+            ],
+            "sql": "select * from cross_cloud_vms;",
+            "table_name": "vms_dataset"
+        },
+        "static_dummy_dataset": {
+            "always_filter_main_dttm": false,
+            "database": {{ stackql_db_id }},
+            "normalize_columns": false,
+            "owners": [
+                {{ user_id }}
+            ],
+            "sql": "select 'Australia' as nation, 55 as machine_count;",
+            "table_name": "static_dummy_dataset"
+        }
+    } 
+pyScriptSecrets:
+  bootstrap.py: |
+    import argparse
+    import json
+    import os
+    import requests
+
+    from jinja2 import Template
+
+    class SupersetBasicAuthClient(object):
+
+        def __init__(
+                self, 
+                username, 
+                password, 
+                protocol='http', 
+                host='localhost', 
+                port=8088,
+                **kwargs):
+            self._host = host
+            self._protocol = protocol
+            self._port = port
+            self._username = username
+            self._password = password
+            self._session = None
+        
+        def _get_csrf_token(self) -> str:
+            return self._session.get(self._adorn_url('/api/v1/security/csrf_token/')).json().get('result')
+
+
+        def _get_token(self) -> dict:
+            self._session = requests.Session()
+            request_body = {
+                'username': self._username,
+                'password': self._password
+            }
+            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+            auth_response = requests.post(self._adorn_url('/login/'), data=request_body, headers=headers, allow_redirects=False)
+            set_cookie = auth_response.headers.get('Set-Cookie', None)
+            session_id = set_cookie.split(';')[0].split('=')[1]
+            self._session.cookies.update({'session': session_id})
+            return {}
+        
+        def _refresh_token(self) -> dict:
+            auth_dict = requests.post(self._adorn_url('/api/v1/security/refresh'), headers={'Authorization', f'Bearer {self._refresh_token}'}).json()
+            self._token = auth_dict.get('access_token')
+            self._refresh_token = auth_dict.get('refresh_token')
+            return auth_dict
+        
+        def _adorn_kwargs(self, **kwargs) -> dict:
+            self._get_token()
+            headers = kwargs.get('headers', {})
+            headers['Authorization'] = f'Bearer {self._token}'
+            kwargs['headers'] = headers
+            return kwargs
+
+        def _adorn_url(self, url :str) -> str:
+            return f'{self._protocol}://{self._host}:{self._port}{url}'
+
+        def get(self, url :str, *args, **kwargs) -> requests.Response:
+            # kwargs = self._adorn_kwargs(**kwargs)
+            self._get_token()
+            return self._session.get(self._adorn_url(url), *args, **kwargs)
+
+        def post(self, url :str, *args, **kwargs) -> requests.Response:
+            # kwargs = self._adorn_kwargs(**kwargs)
+            self._get_token()
+            return self._session.post(self._adorn_url(url), *args, **kwargs)
+
+        def put(self, url :str, *args, **kwargs) -> requests.Response:
+            # kwargs = self._adorn_kwargs(**kwargs)
+            self._get_token()
+            return self._session.put(self._adorn_url(url), *args, **kwargs)
+
+        def delete(self, url :str, *args, **kwargs) -> requests.Response:
+            # kwargs = self._adorn_kwargs(**kwargs)
+            self._get_token()
+            return self._session.delete(self._adorn_url(url), *args, **kwargs)
+
+
+    def main():
+        args = parser.parse_args()
+        resource_templates_dir = args.resource_template_dir
+        client = SupersetBasicAuthClient(
+          args.username, 
+          args.password, 
+          port=args.port,
+          host=args.host,
+          protocol=args.protocol
+        )
+        get_me = client.get('/api/v1/me/')
+        me = get_me.json()
+        user_id = me.get('result', {}).get('id')
+        if user_id is None:
+            raise Exception('no user found')
+        assert get_me.status_code < 300
+        get_databases = client.get('/api/v1/database/')
+        assert get_databases.status_code < 300
+        databases = get_databases.json()
+        db_descriptions = databases.get('result', [])
+        stackql_db_id = -1
+        for db in db_descriptions:
+            if db.get('database_name') == 'StackQL':
+                stackql_db_id = db.get('id', -1)
+                break
+        assert stackql_db_id > -1
+        with open(os.path.join(resource_templates_dir, 'dashboards.json.jinja'), 'r') as f:
+            dashboards_template_raw = f.read() 
+        dashboards_template = Template(dashboards_template_raw)
+        rendered_dashboards = json.loads(
+            dashboards_template.render(
+                {
+                    'user_id': user_id
+                }
+            )
+        )
+        with open(os.path.join(resource_templates_dir, 'datasets.json.jinja'), 'r') as f:
+            datasets_template_raw = f.read() 
+        datasets_template = Template(datasets_template_raw)
+        rendered_datasets = json.loads(
+            datasets_template.render(
+                {
+                    'user_id': user_id,
+                    'stackql_db_id': stackql_db_id
+                }
+            )
+        )
+        # print(
+        #     rendered_datasets
+        # )
+        print(f'current user id = {user_id}')
+        print(f'stackql db id = {stackql_db_id}')
+
+        created_datasets = {}
+        for k, ds in rendered_datasets.items():
+            print(json.dumps(ds))
+            create_response = client.post('/api/v1/dataset/', json=ds)
+            print(json.dumps(create_response.json()))
+            assert create_response.status_code < 300
+            print(create_response.json())
+            created_id = create_response.json().get('id', -1)
+            if created_id != -1:
+                created_datasets[k] = {"id": created_id}
+            print(f'created dataset with table_name = "{ds.get("table_name")}"')
+
+        created_dashboards = {}
+        for k, dashboard in rendered_dashboards.items():
+            create_response = client.post('/api/v1/dashboard/', json=dashboard)
+            assert create_response.status_code < 300
+            print(create_response.json())
+            print(f'created dashboard with table_name = "{dashboard.get("dashboard_title")}"')
+            created_id = create_response.json().get('id', -1)
+            if created_id != -1:
+                created_dashboards[k] = {"id": created_id}
+
+        with open(os.path.join(resource_templates_dir, 'charts.json.jinja'), 'r') as f:
+            charts_template_raw = f.read() 
+        charts_template = Template(charts_template_raw)
+        rendered_charts = json.loads(
+            charts_template.render(
+                {
+                    'user_id': user_id,
+                    'stackql_db_id': stackql_db_id,
+                    'created_datasets': created_datasets,
+                    'created_dashboards': created_dashboards
+                }
+            )
+        )
+        print(
+            json.dumps({
+                    'user_id': user_id,
+                    'stackql_db_id': stackql_db_id,
+                    'created_datasets': created_datasets,
+                    'created_dashboards': created_dashboards
+            })
+        )
+        print(rendered_charts)
+
+        created_charts = []
+        for chart in rendered_charts:
+            create_response = client.post('/api/v1/chart/', json=chart)
+            assert create_response.status_code < 300
+            print(f'created chart with description = "{chart.get("slice_name")}"')
+            response_dict = create_response.json()
+            created_id = response_dict.get('results', {}).get('id', -1)
+            if created_id != -1:
+                created_charts.append(created_id)
+
+        print('bootstrap completed')
+        exit(0)
+
+    parser = argparse.ArgumentParser(description='Process some test config.')
+    parser.add_argument(
+        'username'
+    )
+    parser.add_argument(
+        'password'
+    )
+    parser.add_argument(
+        '--port', 
+        type=int,
+        default=8088,
+        help='network port'
+    )
+    parser.add_argument(
+        '--protocol', 
+        type=str,
+        default='http',
+        help='L7 protocol'
+    )
+    parser.add_argument(
+        '--host', 
+        type=str,
+        default='localhost',
+        help='network host'
+    )
+    parser.add_argument(
+        '--resource_template_dir', 
+        type=str,
+        default= os.path.join(os.path.dirname(os.path.realpath(__file__)), 'resources', 'standard'),
+        help='location for jinja resources templates'
+    )
+
+    if __name__ == '__main__':
+        main()

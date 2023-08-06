@@ -8,6 +8,7 @@ stackql:
       registry pull okta; 
       registry pull aws; 
       registry pull k8s;
+      registry pull googleadmin;
       CREATE OR REPLACE VIEW cross_cloud_vms AS 
       select 
       'google' as cloud,
@@ -25,3 +26,56 @@ stackql:
       from aws.ec2.instances 
       where region = 'ap-southeast-2' 
       ;
+
+superset:
+  image:
+    tag: latest
+      
+  configOverrides:
+    public_role: |
+      PUBLIC_ROLE_LIKE = "Gamma"
+    unsafe_dc: |
+      PREVENT_UNSAFE_DB_CONNECTIONS = False
+    # Essential for automated API provisioning
+    # TODO: orchestrate workloads securely
+    csrf_disable: |
+      WTF_CSRF_ENABLED = False
+
+  init:
+    loadExamples: false
+    initscript: |
+      #!/bin/sh
+      set -eu
+      echo "Upgrading DB schema..."
+      superset db upgrade
+      echo "Initializing roles..."
+      superset init
+      {{ if .Values.init.createAdmin }}
+      echo "Creating admin user..."
+      superset fab create-admin \
+                      --username {{ .Values.init.adminUser.username }} \
+                      --firstname {{ .Values.init.adminUser.firstname }} \
+                      --lastname {{ .Values.init.adminUser.lastname }} \
+                      --email {{ .Values.init.adminUser.email }} \
+                      --password {{ .Values.init.adminUser.password }} \
+                      || true
+      {{- end }}
+      {{- range .Values.init.dbConnections }}
+      superset set_database_uri -d {{ .name | quote }} -u  {{ .uri | quote }}
+      {{- end }}  
+      {{ if .Values.init.loadExamples }}
+      echo "Loading examples..."
+      superset load_examples
+      {{- end }}
+      if [ -f "{{ .Values.extraConfigMountPath }}/import_datasources.yaml" ]; then
+        echo "Importing database connections.... "
+        superset import_datasources -p {{ .Values.extraConfigMountPath }}/import_datasources.yaml
+      fi
+
+primer:
+  enabled: true
+  dashboardAPI:
+    host: v1-superset
+    port: "8088"
+    protocol: http
+    waitForAPITimeout: 180s

@@ -15,12 +15,9 @@ select name, watchers from github.repos.repos where org = 'stackql' and watchers
 
 ## TODO
 
-We probably want to get some more parser support for pg stuff such as interval, eg this does not currently work:
 
-```sql
-select 
-UserName, 
-PasswordLastUsed, 
-CASE WHEN ( TO_TIMESTAMP(PasswordLastUsed, 'YYYY-MM-DDTHH:MI:SSZ') > (now() - interval '7 days' ) ) then true else false end as inactive
-from aws.iam.users WHERE region = 'us-east-1' and PasswordLastUsed is not null;
-```
+### Google workspace
+
+It is possible to [set up service account access to admin APIs](https://developers.google.com/workspace/guides/create-credentials#python).  This includes the directory (user) api.
+
+
