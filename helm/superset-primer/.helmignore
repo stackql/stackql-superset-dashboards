@@ -14,30 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-apiVersion: v2
-# appVersion: "v0.5" # i do not see the upside in this duplication
-description: stackql is an SQL implementation for CRUD on arbitrary resources.
-name: stackql
-# icon: https://artifacthub.io/image/68c1d717-0e97-491f-b046-754e46f46922@2x
-home: https://stackql.io/
-keywords:
-  - SQL
-  - IAC
-  - Infrastructure as Code
-  - Transactional
-  - CRUD
-  - Analytical
-  - OLAP
-  - OLTP
-sources:
-  - https://github.com/stackql/stackql
-maintainers:
-  - name: General Kroll
-    email: generalkroll0@gmail.com
-    url: https://github.com/general-kroll-4-life
-version: 0.1.6
-dependencies:
-  - name: postgresql
-    version: 12.4.2
-    repository: https://charts.bitnami.com/bitnami
-    condition: postgresql.enabled
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+.DS_Store
+# Common VCS dirs
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*~
+# Various IDEs
+.project
+.idea/
+*.tmproj
+.DS_Store

@@ -1,0 +1,44 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "inputs": [
+        {
+            "type": "promptString",
+            "id": "password",
+            "password": true,
+            "description": "Password",
+            "default": "changeme",
+        },
+        {
+            "type": "promptString",
+            "id": "username",
+            "password": false,
+            "description": "User Name",
+            "default": "changeme",
+        },
+        {
+            "type": "promptString",
+            "id": "port",
+            "password": false,
+            "description": "Port",
+            "default": "8088",
+        }
+    ],
+    "configurations": [
+        {
+            "name": "Python: Bootstrap Script",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/bootstrap/bootstrap.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:username}",
+                "${input:password}",
+                "--port=${input:port}"
+            ],
+            "justMyCode": true
+        }
+    ]
+}

@@ -1,6 +1,8 @@
 
 stackql:
   enabled: true
+  image:
+    pullPolicy: Always
 
 superset:
   enabled: true
@@ -15,3 +17,6 @@ superset:
       password: somepassword
   redis:
     nameOverride: superset-redis
+  configOverrides:
+    public_role: |
+      PUBLIC_ROLE_LIKE = "Gamma"

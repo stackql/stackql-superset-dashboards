@@ -1,0 +1,32 @@
+{
+    "manual_dataset": {
+        "always_filter_main_dttm": false,
+        "database": {{ stackql_db_id }},
+        "normalize_columns": false,
+        "owners": [
+            {{ user_id }}
+        ],
+        "sql": "select name, split_part(split_part(machineType, '/', 11), '-', 2) as type,  json_extract_path_text(json_extract_path_text(networkInterfaces, '0'), 'networkIP') as ipAddress from google.compute.instances  where project = 'stackql-demo' and zone = 'australia-southeast1-a';",
+        "table_name": "manual_dataset"
+    },
+    "vms_dataset": {
+        "always_filter_main_dttm": false,
+        "database": {{ stackql_db_id }},
+        "normalize_columns": false,
+        "owners": [
+            {{ user_id }}
+        ],
+        "sql": "select * from cross_cloud_vms;",
+        "table_name": "vms_dataset"
+    },
+    "static_dummy_dataset": {
+        "always_filter_main_dttm": false,
+        "database": {{ stackql_db_id }},
+        "normalize_columns": false,
+        "owners": [
+            {{ user_id }}
+        ],
+        "sql": "select 'Australia' as nation, 55 as machine_count;",
+        "table_name": "static_dummy_dataset"
+    }
+}
