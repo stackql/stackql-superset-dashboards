@@ -35,7 +35,7 @@ maintainers:
   - name: General Kroll
     email: generalkroll0@gmail.com
     url: https://github.com/general-kroll-4-life
-version: 0.1.6
+version: 0.1.7
 dependencies:
   - name: postgresql
     version: 12.4.2

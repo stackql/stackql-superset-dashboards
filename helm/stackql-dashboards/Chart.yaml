@@ -15,10 +15,10 @@ maintainers:
   - name: General Kroll
     email: generalkroll0@gmail.com
     url: https://github.com/general-kroll-4-life
-version: 0.1.2
+version: 0.1.3
 dependencies:
   - name: stackql
-    version: 0.1.6
+    version: 0.1.7
     repository: "file://../stackql"
     condition: stackql.enabled
   - name: superset
@@ -27,6 +27,6 @@ dependencies:
     condition: superset.enabled
   - name: superset-primer
     alias: primer
-    version: 0.0.3
+    version: 0.0.5
     repository: "file://../superset-primer"
     condition: primer.enabled

@@ -24,7 +24,7 @@ psql --host localhost -U stackql -d stackql --port <local port number for stackq
 ### Manual testing of stackql-dashboard
 
 ```shell
-helm dependency update helm/stackql-dashboards
+helm dependency update helm/stackql-dashboards # this one comes in handy every time anything is re-versioned
 
 helm template --release-name v1 --namespace default helm/stackql-dashboards --set superset.image.tag=latest --set superset.loadExamples=false > helm/stackql-dashboards/out/stackql-dashboards.yaml
 

@@ -147,8 +147,7 @@ def main():
     with open(os.path.join(resource_templates_dir, 'charts.json.jinja'), 'r') as f:
         charts_template_raw = f.read() 
     charts_template = Template(charts_template_raw)
-    rendered_charts = json.loads(
-        charts_template.render(
+    raw_expanded_charts = charts_template.render(
             {
                 'user_id': user_id,
                 'stackql_db_id': stackql_db_id,
@@ -156,6 +155,9 @@ def main():
                 'created_dashboards': created_dashboards
             }
         )
+    # print(raw_expanded_charts)
+    rendered_charts = json.loads(
+        raw_expanded_charts
     )
     print(
         json.dumps({

@@ -28,5 +28,45 @@
         ],
         "sql": "select 'Australia' as nation, 55 as machine_count;",
         "table_name": "static_dummy_dataset"
+    },
+    "block_storage_dataset": {
+        "always_filter_main_dttm": false,
+        "database": {{ stackql_db_id }},
+        "normalize_columns": false,
+        "owners": [
+            {{ user_id }}
+        ],
+        "sql": "SELECT * from google_block_storage;",
+        "table_name": "block_storage_dataset"
+    },
+    "blob_storage_dataset": {
+        "always_filter_main_dttm": false,
+        "database": {{ stackql_db_id }},
+        "normalize_columns": false,
+        "owners": [
+            {{ user_id }}
+        ],
+        "sql": "SELECT * from google_blob_storage;",
+        "table_name": "blob_storage_dataset"
+    },
+    "subnet_distribution_dataset": {
+        "always_filter_main_dttm": false,
+        "database": {{ stackql_db_id }},
+        "normalize_columns": false,
+        "owners": [
+            {{ user_id }}
+        ],
+        "sql": "SELECT * from google_subnet_locations;",
+        "table_name": "subnet_distribution_dataset"
+    },
+    "celeb_contribution_dataset": {
+        "always_filter_main_dttm": false,
+        "database": {{ stackql_db_id }},
+        "normalize_columns": false,
+        "owners": [
+            {{ user_id }}
+        ],
+        "sql": "SELECT * from org_celeb_contributors;",
+        "table_name": "celeb_contribution_dataset"
     }
 }
