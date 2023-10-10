@@ -51,7 +51,7 @@ superset:
       password: '<create your password for Superset admin user>'
     dbConnections:
       - name: 'StackQL'
-        uri: 'postgres://stackql:stackql@v1-stackql:7432/stackql' # not secure and not intended to venture off your local machine; you have the power to change all this... proceed with caution
+        uri: 'postgres://<make up your username>:<make up your password>@v1-stackql:7432/stackql' # not intended to venture off your local machine; you have the power to change all this... proceed with caution
 
 primer:
   dashboardAPI:
