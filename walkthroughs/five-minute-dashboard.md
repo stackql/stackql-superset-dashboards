@@ -19,7 +19,7 @@ From the root directory of this repository:
 helm dependency update helm/stackql-dashboards
 ```
 
-Create a file with all of the secrets for `superset` admin login and all the various providers that `stackql` will access at ``, for example:
+Create a file with all of the secrets for `superset` admin login and all the various providers that `stackql` will access at `helm/stackql-dashboards/secrets/secret-values.yaml`, for example:
 
 ```yaml
 stackql:
